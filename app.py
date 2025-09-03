@@ -3,30 +3,27 @@ import torch
 import joblib
 import numpy as np
 from transformers import BertTokenizer
-from huggingface_hub import hf_hub_download
 from model import SentimentClassifier
 
-# Load Model 
+
+# Load Model & Components
 @st.cache_resource
 def load_model_and_components():
     try:
-        # Download from Hugging Face model repo
-        MODEL_REPO = "KR5/sentiment-bert"
+        # Local paths (make sure these files are in the same folder as this app)
+        LABEL_ENCODER_PATH = "label_encoder.pkl"
+        MODEL_PATH = "bert_sentiment.pt"
 
-        # Label encoder
-        label_encoder_path = hf_hub_download(repo_id=MODEL_REPO, filename="label_encoder.pkl")
-        label_encoder = joblib.load(label_encoder_path)
+        # Load label encoder
+        label_encoder = joblib.load(LABEL_ENCODER_PATH)
 
-        # Model weights
-        model_path = hf_hub_download(repo_id=MODEL_REPO, filename="bert_sentiment.pt")
-
-        # Tokenizer
+        # Load tokenizer
         tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 
         # Initialize model
         num_labels = len(label_encoder.classes_)
         model = SentimentClassifier(num_labels=num_labels)
-        model.load_state_dict(torch.load(model_path, map_location="cpu"))
+        model.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
         model.eval()
 
         return model, tokenizer, label_encoder
