@@ -100,3 +100,7 @@ streamlit run app.py
    - **Class probabilities**
 4. Click example buttons to quickly test predefined sentences.
 
+
+## 🔗 App Link
+I hope you take a look and try with simple texts.
+LINK: https://bertsentimentanalysis-j6j4tvgtjvsmlnh8ksahhd.streamlit.app
