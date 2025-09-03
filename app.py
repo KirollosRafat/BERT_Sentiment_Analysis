@@ -1,29 +1,28 @@
 import streamlit as st
 import torch
-import joblib
 import numpy as np
-from transformers import BertTokenizer
-from model import SentimentClassifier
+from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
+from sklearn.preprocessing import LabelEncoder
+import joblib
 
 
 # Load Model & Components
 @st.cache_resource
 def load_model_and_components():
     try:
-        # Local paths (make sure these files are in the same folder as this app)
-        LABEL_ENCODER_PATH = "label_encoder.pkl"
-        MODEL_PATH = "bert_sentiment.pt"
-
-        # Load label encoder
+        # Local paths
+        LABEL_ENCODER_PATH = "label_encoder.pkl"  # your local label encoder
         label_encoder = joblib.load(LABEL_ENCODER_PATH)
 
-        # Load tokenizer
-        tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+        # Tokenizer
+        tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
 
-        # Initialize model
-        num_labels = len(label_encoder.classes_)
-        model = SentimentClassifier(num_labels=num_labels)
-        model.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
+        # Model
+        model = DistilBertForSequenceClassification.from_pretrained(
+            "distilbert-base-uncased",
+            num_labels=len(label_encoder.classes_),
+            torch_dtype=torch.float16  # fp16 for smaller memory
+        )
         model.eval()
 
         return model, tokenizer, label_encoder
@@ -44,13 +43,13 @@ def predict_sentiment(text, model, tokenizer, label_encoder):
     )
 
     with torch.no_grad():
-        outputs = model(encoding["input_ids"], encoding["attention_mask"])
-        probabilities = torch.softmax(outputs, dim=1)
+        outputs = model(**encoding)
+        probabilities = torch.softmax(outputs.logits, dim=1)
         predicted_class = torch.argmax(probabilities, dim=1).item()
         confidence = probabilities[0][predicted_class].item()
 
     predicted_label = label_encoder.inverse_transform([predicted_class])[0]
-    return predicted_label, confidence, probabilities[0].numpy()
+    return predicted_label, confidence, probabilities[0].cpu().numpy()
 
 
 # Streamlit UI
@@ -74,7 +73,6 @@ def main():
                     )
 
                     st.success("✅ Analysis Complete!")
-
                     col1, col2 = st.columns(2)
                     col1.metric("Predicted Sentiment", predicted_label)
                     col2.metric("Confidence", f"{confidence:.2%}")
@@ -105,5 +103,6 @@ def main():
             st.experimental_rerun()
 
 
+# Run App
 if __name__ == "__main__":
     main()
