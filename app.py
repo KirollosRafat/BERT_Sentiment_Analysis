@@ -5,23 +5,21 @@ from transformers import DistilBertTokenizer, DistilBertForSequenceClassificatio
 from sklearn.preprocessing import LabelEncoder
 import joblib
 
-
+# --------------------------
 # Load Model & Components
+# --------------------------
 @st.cache_resource
 def load_model_and_components():
     try:
-        # Local paths
-        LABEL_ENCODER_PATH = "label_encoder.pkl"  # your local label encoder
+        LABEL_ENCODER_PATH = "label_encoder.pkl"
         label_encoder = joblib.load(LABEL_ENCODER_PATH)
 
-        # Tokenizer
         tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
 
-        # Model
         model = DistilBertForSequenceClassification.from_pretrained(
             "distilbert-base-uncased",
             num_labels=len(label_encoder.classes_),
-            torch_dtype=torch.float16  # fp16 for smaller memory
+            torch_dtype=torch.float16
         )
         model.eval()
 
@@ -31,8 +29,9 @@ def load_model_and_components():
         st.error(f"❌ Error loading model: {e}")
         return None, None, None
 
-
-# Make Predictions
+# --------------------------
+# Prediction Function
+# --------------------------
 def predict_sentiment(text, model, tokenizer, label_encoder):
     encoding = tokenizer(
         text,
@@ -51,25 +50,38 @@ def predict_sentiment(text, model, tokenizer, label_encoder):
     predicted_label = label_encoder.inverse_transform([predicted_class])[0]
     return predicted_label, confidence, probabilities[0].cpu().numpy()
 
-
+# --------------------------
 # Streamlit UI
+# --------------------------
 def main():
     st.set_page_config(page_title="Sentiment Analysis App", page_icon="😊", layout="centered")
     st.title("🎭 Sentiment Analysis App")
     st.markdown("Enter text below to analyze its sentiment!")
 
+    # Initialize session_state for input
+    if "user_input" not in st.session_state:
+        st.session_state.user_input = ""
+
     model, tokenizer, label_encoder = load_model_and_components()
     if model is None:
         st.stop()
 
-    user_input = st.text_area("Enter text to analyze:", placeholder="Type something here...", height=100)
+    user_input = st.text_area(
+        "Enter text to analyze:",
+        value=st.session_state.user_input,
+        placeholder="Type something here...",
+        height=100
+    )
+
+    # Update session_state
+    st.session_state.user_input = user_input
 
     if st.button("🔍 Analyze Sentiment"):
-        if user_input.strip():
+        if st.session_state.user_input.strip():
             with st.spinner("Analyzing..."):
                 try:
                     predicted_label, confidence, all_probabilities = predict_sentiment(
-                        user_input, model, tokenizer, label_encoder
+                        st.session_state.user_input, model, tokenizer, label_encoder
                     )
 
                     st.success("✅ Analysis Complete!")
@@ -77,7 +89,6 @@ def main():
                     col1.metric("Predicted Sentiment", predicted_label)
                     col2.metric("Confidence", f"{confidence:.2%}")
 
-                    # Probabilities chart
                     st.subheader("Class Probabilities")
                     prob_data = {cls: float(all_probabilities[i]) for i, cls in enumerate(label_encoder.classes_)}
                     st.bar_chart(prob_data)
@@ -99,10 +110,11 @@ def main():
     ]
     for i, ex in enumerate(examples):
         if st.button(f"Example {i+1}"):
-            st.session_state["example_text"] = ex
-            st.experimental_rerun()
+            # Instead of rerun, just set session_state and update text_area
+            st.session_state.user_input = ex
 
-
+# --------------------------
 # Run App
+# --------------------------
 if __name__ == "__main__":
     main()
